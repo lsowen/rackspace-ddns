@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 
 CONFIG_LOCATION="${1}"
 NEW_IP="${2}"
@@ -14,16 +14,13 @@ retrieve_token() {
     local ENDPOINT="https://identity.api.rackspacecloud.com/v2.0/tokens"
 
  
-    read -r -d '' PAYLOAD <<EOF
-<?xml version="1.0" encoding="UTF-8"?>
+    local PAYLOAD=$(printf '<?xml version="1.0" encoding="UTF-8"?>
 <auth>
-<apiKeyCredentials xmlns="http://docs.rackspace.com/identity/api/ext/RAX-KSKEY/v1.0" username="${API_USERNAME}" apiKey="${API_KEY}"/>
-</auth>
-EOF
-    
+<apiKeyCredentials xmlns="http://docs.rackspace.com/identity/api/ext/RAX-KSKEY/v1.0" username="%s" apiKey="%s"/>
+</auth>' "${API_USERNAME}" "${API_KEY}")
+
     # Specify insecure because OpenWRT doesn't provide a CA cert bundle
     local RESPONSE=$( curl --insecure --silent "${ENDPOINT}" -H "Content-Type: application/xml" --data "${PAYLOAD}" -H "Accept: application/xml" )
-
     local TOKEN=$( echo "${RESPONSE}" | grep "<token" | sed 's/.*token id="\([0-z]*\)".*/\1/' )
 
     echo "${TOKEN}"
@@ -32,10 +29,9 @@ EOF
 lookup_domain_id() {
     local API_TOKEN="${1}"
     local DOMAIN_NAME="${2}"
-    local ENDPOINT="{$CLOUDDNS_ENDPOINT}/domains/?name=${DOMAIN_NAME}"
+    local ENDPOINT="${CLOUDDNS_ENDPOINT}/domains/?name=${DOMAIN_NAME}"
 
-
-    local RESPONSE=$( curl --silent "${ENDPOINT}" -H "Accept: application/xml" -H "X-Auth-Token: ${API_TOKEN}" )
+    local RESPONSE=$( curl --insecure --silent "${ENDPOINT}" -H "Accept: application/xml" -H "X-Auth-Token: ${API_TOKEN}" )
 
     echo $RESPONSE
 }
@@ -62,11 +58,8 @@ update_record() {
     local RECORD_DATA="${4}"
     local ENDPOINT="{$CLOUDDNS_ENDPOINT}/domains/${DOMAIN_ID}/records/${RECORD_ID}"
 
-    read -r -d '' PAYLOAD <<EOF
-<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<record data="${RECORD_DATA}" ttl="3600" xmlns:ns2="http://www.w3.org/2005/Atom" xmlns="http://docs.rackspacecloud.com/dns/api/v1.0" xmlns:ns3="http://docs.rackspacecloud.com/dns/api/management/v1.0"/>
-EOF
-
+    local PAYLOAD=$(printf '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<record data="%s" ttl="3600" xmlns:ns2="http://www.w3.org/2005/Atom" xmlns="http://docs.rackspacecloud.com/dns/api/v1.0" xmlns:ns3="http://docs.rackspacecloud.com/dns/api/management/v1.0"/>' "${RECORD_DATA}")
 
     # Specify insecure because OpenWRT doesn't provide a CA cert bundle
     local RESPONSE=$( curl -X PUT --silent --insecure "${ENDPOINT}" -H "Content-Type: application/xml" --data "${PAYLOAD}" -H "Accept: application/xml" -H "X-Auth-Token: ${API_TOKEN}" )
@@ -84,7 +77,7 @@ check_status() {
 }
 
 
-
+#retrieve_token "${API_USERNAME}" "${API_KEY}"
 TOKEN=$( retrieve_token "${API_USERNAME}" "${API_KEY}" )
 update_record "${TOKEN}" "${DOMAIN_ID}" "${RECORD_ID}" "${NEW_IP}" > /dev/null
 
